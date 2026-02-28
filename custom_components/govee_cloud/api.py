@@ -74,7 +74,8 @@ class GoveeAPI:
                 else "unknown"
             )
 
-            with open(self._token_file, "w") as f:
+            fd = os.open(self._token_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, "w") as f:
                 json.dump({"token": token}, f)
             _LOGGER.info("Token cached successfully (expires: %s)", exp_str)
         except Exception as err:
@@ -117,7 +118,12 @@ class GoveeAPI:
         response = session.post(LOGIN_ENDPOINT, json=login_data)
         response.raise_for_status()
 
-        token = response.json()["client"]["token"]
+        data = response.json()
+        if "client" not in data or "token" not in data.get("client", {}):
+            msg = data.get("message") or data.get("msg") or str(data)
+            raise ValueError(f"Govee login failed: {msg}")
+
+        token = data["client"]["token"]
         self._save_token(token)
         _LOGGER.info("Successfully authenticated with Govee API")
         return token
