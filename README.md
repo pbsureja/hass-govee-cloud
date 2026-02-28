@@ -1,8 +1,8 @@
 # Govee Cloud – Home Assistant Integration
 
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=rwestergren&repository=hass-govee-cloud&category=integration)
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=pbsureja&repository=hass-govee-cloud&category=integration)
 
-[![HACS Custom](https://img.shields.io/badge/HACS-Custom-blue.svg?style=flat-square)](https://hacs.xyz/) [![GitHub issues](https://img.shields.io/github/issues/rwestergren/hass-govee-cloud?style=flat-square)](https://github.com/rwestergren/hass-govee-cloud/issues)
+[![HACS Custom](https://img.shields.io/badge/HACS-Custom-blue.svg?style=flat-square)](https://hacs.xyz/) [![GitHub issues](https://img.shields.io/github/issues/pbsureja/hass-govee-cloud?style=flat-square)](https://github.com/pbsureja/hass-govee-cloud/issues)
 
 This custom integration connects Govee cloud-connected thermometers to Home Assistant, providing temperature, humidity, and battery level data.
 
@@ -23,7 +23,7 @@ This custom integration connects Govee cloud-connected thermometers to Home Assi
 
 ### **HACS (custom repository)**
 
-1. In HACS, go to **Integrations → Custom repositories** and add this repository URL (`https://github.com/rwestergren/hass-govee-cloud`) as **Integration**.
+1. In HACS, go to **Integrations → Custom repositories** and add this repository URL (`https://github.com/pbsureja/hass-govee-cloud`) as **Integration**.
 2. Search for "Govee Cloud" in HACS and install it.
 3. Restart Home Assistant.
 
