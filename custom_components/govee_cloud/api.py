@@ -118,7 +118,12 @@ class GoveeAPI:
         response = session.post(LOGIN_ENDPOINT, json=login_data)
         response.raise_for_status()
 
-        token = response.json()["client"]["token"]
+        data = response.json()
+        if "client" not in data or "token" not in data.get("client", {}):
+            msg = data.get("message") or data.get("msg") or str(data)
+            raise ValueError(f"Govee login failed: {msg}")
+
+        token = data["client"]["token"]
         self._save_token(token)
         _LOGGER.info("Successfully authenticated with Govee API")
         return token
