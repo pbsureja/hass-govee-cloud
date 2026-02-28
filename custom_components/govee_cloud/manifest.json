@@ -1,11 +1,11 @@
 {
   "domain": "govee_cloud",
   "name": "Govee Cloud",
-  "codeowners": ["@rwestergren"],
+  "codeowners": ["@pbsureja"],
   "config_flow": true,
-  "documentation": "https://github.com/rwestergren/hass-govee-cloud",
-  "issue_tracker": "https://github.com/rwestergren/hass-govee-cloud/issues",
+  "documentation": "https://github.com/pbsureja/hass-govee-cloud",
+  "issue_tracker": "https://github.com/pbsureja/hass-govee-cloud/issues",
   "iot_class": "cloud_polling",
-  "requirements": ["PyJWT>=2.0.0"],
-  "version": "0.1.0"
+  "requirements": [],
+  "version": "0.2.0"
 }

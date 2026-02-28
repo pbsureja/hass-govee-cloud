@@ -5,7 +5,7 @@ from typing import Any, Dict, Optional
 
 import voluptuous as vol
 from homeassistant import config_entries
-from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
+from homeassistant.const import CONF_API_KEY
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
 
@@ -17,18 +17,17 @@ _LOGGER = logging.getLogger(__name__)
 
 async def validate_input(hass: HomeAssistant, data: Dict[str, Any]) -> Dict[str, Any]:
     """Validate the user input allows us to connect."""
-    api_client = GoveeAPI(hass, data[CONF_EMAIL], data[CONF_PASSWORD])
+    api_client = GoveeAPI(hass, data[CONF_API_KEY])
 
-    # Test authentication by getting devices using executor
     devices = await hass.async_add_executor_job(api_client.get_devices)
 
-    return {"title": f"Govee Cloud ({data[CONF_EMAIL]})", "num_devices": len(devices)}
+    return {"title": "Govee Cloud", "num_devices": len(devices)}
 
 
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Govee Cloud."""
 
-    VERSION = 1
+    VERSION = 2
 
     async def async_step_user(
         self, user_input: Optional[Dict[str, Any]] = None
@@ -39,8 +38,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 step_id="user",
                 data_schema=vol.Schema(
                     {
-                        vol.Required(CONF_EMAIL, description="Email Address"): str,
-                        vol.Required(CONF_PASSWORD, description="Password"): str,
+                        vol.Required(CONF_API_KEY): str,
                     }
                 ),
             )
@@ -50,9 +48,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         try:
             info = await validate_input(self.hass, user_input)
         except ValueError as err:
-            _LOGGER.error("Govee authentication failed: %s", err)
+            _LOGGER.error("Govee API validation failed: %s", err)
             errors["base"] = "invalid_auth"
-        except Exception:  # pylint: disable=broad-except
+        except Exception:
             _LOGGER.exception("Unexpected exception")
             errors["base"] = "unknown"
         else:
@@ -63,14 +61,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data_schema=vol.Schema(
                 {
                     vol.Required(
-                        CONF_EMAIL,
-                        default=user_input.get(CONF_EMAIL, ""),
-                        description="Email Address",
-                    ): str,
-                    vol.Required(
-                        CONF_PASSWORD,
-                        default=user_input.get(CONF_PASSWORD, ""),
-                        description="Password",
+                        CONF_API_KEY,
+                        default=user_input.get(CONF_API_KEY, ""),
                     ): str,
                 }
             ),

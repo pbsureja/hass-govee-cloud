@@ -35,19 +35,16 @@ async def async_setup_entry(
 
     entities = []
     for device in coordinator.data:
-        device_id = device.get("device")  # MAC address
+        device_id = device.get("device")
+        sensor_data = api_client.extract_device_data(device.get("state", {}))
 
-        # Add temperature sensor
-        entities.append(
-            GoveeTemperatureSensor(
-                coordinator, api_client, device_id, device, config_entry
+        if sensor_data.get("temperature") is not None:
+            entities.append(
+                GoveeTemperatureSensor(
+                    coordinator, api_client, device_id, device, config_entry
+                )
             )
-        )
 
-        # Extract device data to check what sensors to add
-        sensor_data = api_client.extract_device_data(device)
-
-        # Add humidity sensor if available
         if sensor_data.get("humidity") is not None:
             entities.append(
                 GoveeHumiditySensor(
@@ -55,7 +52,6 @@ async def async_setup_entry(
                 )
             )
 
-        # Add battery sensor if available
         if sensor_data.get("battery") is not None:
             entities.append(
                 GoveeBatterySensor(
@@ -89,11 +85,9 @@ class GoveeBaseSensor(CoordinatorEntity, SensorEntity):
         """Return device information."""
         return DeviceInfo(
             identifiers={(DOMAIN, self.device_id)},
-            name=self.device_info_dict.get("deviceName", "Govee Thermometer"),
+            name=self.device_info_dict.get("deviceName", "Govee Sensor"),
             manufacturer="Govee",
             model=self.device_info_dict.get("sku"),
-            sw_version=self.device_info_dict.get("versionSoft"),
-            hw_version=self.device_info_dict.get("versionHard"),
         )
 
     @property
@@ -113,11 +107,11 @@ class GoveeBaseSensor(CoordinatorEntity, SensorEntity):
         device = self._get_device()
         if device is None:
             return {}
-        return self.api_client.extract_device_data(device)
+        return self.api_client.extract_device_data(device.get("state", {}))
 
 
 class GoveeTemperatureSensor(GoveeBaseSensor):
-    """Temperature sensor for Govee thermometer."""
+    """Temperature sensor for Govee device."""
 
     def __init__(
         self,
@@ -130,7 +124,7 @@ class GoveeTemperatureSensor(GoveeBaseSensor):
         """Initialize the temperature sensor."""
         super().__init__(coordinator, api_client, device_id, device_info, config_entry)
         self._attr_name = (
-            f"{device_info.get('deviceName', 'Govee Thermometer')} Temperature"
+            f"{device_info.get('deviceName', 'Govee Sensor')} Temperature"
         )
         self._attr_unique_id = f"{device_id}_temperature"
         self._attr_device_class = SensorDeviceClass.TEMPERATURE
@@ -145,7 +139,7 @@ class GoveeTemperatureSensor(GoveeBaseSensor):
 
 
 class GoveeHumiditySensor(GoveeBaseSensor):
-    """Humidity sensor for Govee thermometer."""
+    """Humidity sensor for Govee device."""
 
     def __init__(
         self,
@@ -158,7 +152,7 @@ class GoveeHumiditySensor(GoveeBaseSensor):
         """Initialize the humidity sensor."""
         super().__init__(coordinator, api_client, device_id, device_info, config_entry)
         self._attr_name = (
-            f"{device_info.get('deviceName', 'Govee Thermometer')} Humidity"
+            f"{device_info.get('deviceName', 'Govee Sensor')} Humidity"
         )
         self._attr_unique_id = f"{device_id}_humidity"
         self._attr_device_class = SensorDeviceClass.HUMIDITY
@@ -173,7 +167,7 @@ class GoveeHumiditySensor(GoveeBaseSensor):
 
 
 class GoveeBatterySensor(GoveeBaseSensor):
-    """Battery sensor for Govee thermometer."""
+    """Battery sensor for Govee device."""
 
     def __init__(
         self,
@@ -186,7 +180,7 @@ class GoveeBatterySensor(GoveeBaseSensor):
         """Initialize the battery sensor."""
         super().__init__(coordinator, api_client, device_id, device_info, config_entry)
         self._attr_name = (
-            f"{device_info.get('deviceName', 'Govee Thermometer')} Battery"
+            f"{device_info.get('deviceName', 'Govee Sensor')} Battery"
         )
         self._attr_unique_id = f"{device_id}_battery"
         self._attr_device_class = SensorDeviceClass.BATTERY

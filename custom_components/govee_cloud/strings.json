@@ -1,0 +1,17 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Govee Cloud",
+        "description": "Enter your Govee Developer API key. You can get one at https://developer.govee.com/",
+        "data": {
+          "api_key": "API Key"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid API key",
+      "unknown": "Unexpected error"
+    }
+  }
+}

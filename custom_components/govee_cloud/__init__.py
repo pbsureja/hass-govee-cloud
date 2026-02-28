@@ -6,7 +6,7 @@ import logging
 from datetime import timedelta
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_EMAIL, CONF_PASSWORD, Platform
+from homeassistant.const import CONF_API_KEY, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
@@ -21,13 +21,28 @@ PLATFORMS: list[Platform] = [Platform.SENSOR]
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Govee Cloud from a config entry."""
     hass.data.setdefault(DOMAIN, {})
-    api_client = GoveeAPI(
-        hass=hass, email=entry.data[CONF_EMAIL], password=entry.data[CONF_PASSWORD]
-    )
+    api_client = GoveeAPI(hass=hass, api_key=entry.data[CONF_API_KEY])
 
     async def async_update_data():
         """Fetch data from API endpoint."""
-        return await hass.async_add_executor_job(api_client.get_devices)
+        devices = await hass.async_add_executor_job(api_client.get_devices)
+
+        # Fetch state for each device
+        results = []
+        for device in devices:
+            sku = device.get("sku", "")
+            device_id = device.get("device", "")
+            state = await hass.async_add_executor_job(
+                api_client.get_device_state, sku, device_id
+            )
+            results.append({
+                "device": device_id,
+                "sku": sku,
+                "deviceName": device.get("deviceName", ""),
+                "state": state,
+            })
+
+        return results
 
     coordinator = DataUpdateCoordinator(
         hass,

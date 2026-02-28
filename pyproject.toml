@@ -1,12 +1,11 @@
 [project]
 name = "govee-cloud"
-version = "0.1.0"
+version = "0.2.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "homeassistant>=0.45.1",
-    "pyjwt>=2.10.1",
     "requests>=2.32.4",
 ]
 

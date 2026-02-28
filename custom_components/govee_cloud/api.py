@@ -1,200 +1,105 @@
-"""Govee Cloud API client."""
+"""Govee Cloud API client using the official Developer API."""
 
-import json
 import logging
-import os
-import time
-from typing import Dict, List, Optional
+import uuid
+from typing import Any, Dict, List, Optional
 
-import jwt
 import requests
 from homeassistant.core import HomeAssistant
 
-from .const import DEVICES_ENDPOINT, LOGIN_ENDPOINT, THERMOMETER_SKU
+from .const import DEVICES_ENDPOINT, DEVICE_STATE_ENDPOINT
 
 _LOGGER = logging.getLogger(__name__)
+
+# Capabilities that indicate a sensor device
+SENSOR_CAPABILITIES = {"sensorTemperature", "sensorHumidity"}
 
 
 class GoveeAPI:
     """Govee Cloud API client."""
 
-    def __init__(self, hass: HomeAssistant, email: str, password: str):
+    def __init__(self, hass: HomeAssistant, api_key: str):
         """Initialize the API client."""
         self.hass = hass
-        self.email = email
-        self.password = password
-        self._token = None
-        self._token_file = os.path.join(hass.config.config_dir, ".govee_token.json")
+        self._api_key = api_key
 
-    def govee_temp_value(self, api_value: int) -> float:
-        """Extract temperature value from Govee API in Celsius."""
-        celsius = api_value / 100.0
-        return round(celsius, 1)
-
-    def _load_token(self) -> Optional[str]:
-        """Load JWT token from file if it exists and is not expired."""
-        if not os.path.exists(self._token_file):
-            _LOGGER.debug("No cached token found")
-            return None
-
-        try:
-            with open(self._token_file, "r") as f:
-                data = json.load(f)
-
-            token = data.get("token")
-            if not token:
-                return None
-
-            # Decode JWT to check expiration
-            decoded = jwt.decode(token, options={"verify_signature": False})
-            exp = decoded.get("exp")
-
-            if exp and exp > time.time():
-                _LOGGER.info(
-                    "Using cached token (expires: %s)",
-                    time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(exp)),
-                )
-                return token
-            else:
-                _LOGGER.info("Cached token expired, will need to re-authenticate")
-                return None
-
-        except Exception as err:
-            _LOGGER.debug("Error loading cached token: %s", err)
-            return None
-
-    def _save_token(self, token: str) -> None:
-        """Save JWT token to file."""
-        try:
-            decoded = jwt.decode(token, options={"verify_signature": False})
-            exp = decoded.get("exp")
-            exp_str = (
-                time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(exp))
-                if exp
-                else "unknown"
-            )
-
-            fd = os.open(self._token_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-            with os.fdopen(fd, "w") as f:
-                json.dump({"token": token}, f)
-            _LOGGER.info("Token cached successfully (expires: %s)", exp_str)
-        except Exception as err:
-            _LOGGER.error("Failed to cache token: %s", err)
-
-    def _login(self) -> str:
-        """Login to Govee API and return token."""
-        _LOGGER.info("Authenticating with Govee API")
-
-        session = requests.Session()
-        session.headers.update(
-            {
-                "sysVersion": "12",
-                "country": "US",
-                "appVersion": "7.0.30",
-                "clientId": "53b5cfa4c9726a27",
-                "clientType": "0",
-                "timezone": "America/New_York",
-                "Accept-Language": "en",
-                "envId": "0",
-                "iotVersion": "0",
-                "Content-Type": "application/json; charset=UTF-8",
-                "User-Agent": "okhttp/4.12.0",
-            }
-        )
-
-        timestamp = int(time.time() * 1000)
-        login_data = {
-            "client": "53b5cfa4c9726a27",
-            "code1": "",
-            "email": self.email,
-            "password": self.password,
-            "key": "",
-            "view": 0,
-            "transaction": str(timestamp),
+    def _headers(self) -> Dict[str, str]:
+        """Return common request headers."""
+        return {
+            "Content-Type": "application/json",
+            "Govee-API-Key": self._api_key,
         }
-
-        session.headers["timestamp"] = str(timestamp)
-
-        response = session.post(LOGIN_ENDPOINT, json=login_data)
-        response.raise_for_status()
-
-        data = response.json()
-        if "client" not in data or "token" not in data.get("client", {}):
-            msg = data.get("message") or data.get("msg") or str(data)
-            raise ValueError(f"Govee login failed: {msg}")
-
-        token = data["client"]["token"]
-        self._save_token(token)
-        _LOGGER.info("Successfully authenticated with Govee API")
-        return token
-
-    def _ensure_authenticated(self) -> None:
-        """Ensure we have a valid authentication token."""
-        if self._token is None:
-            self._token = self._load_token()
-
-        if self._token is None:
-            self._token = self._login()
 
     def get_devices(self) -> List[Dict]:
-        """Get list of thermometer devices."""
-        self._ensure_authenticated()
-
-        session = requests.Session()
-        session.headers.update(
-            {
-                "sysVersion": "12",
-                "country": "US",
-                "appVersion": "7.0.30",
-                "clientId": "53b5cfa4c9726a27",
-                "clientType": "0",
-                "timezone": "America/New_York",
-                "Accept-Language": "en",
-                "envId": "0",
-                "iotVersion": "0",
-                "Content-Type": "application/json; charset=UTF-8",
-                "User-Agent": "okhttp/4.12.0",
-                "Authorization": f"Bearer {self._token}",
-            }
-        )
-
-        response = session.get(DEVICES_ENDPOINT)
+        """Get list of devices with sensor capabilities."""
+        response = requests.get(DEVICES_ENDPOINT, headers=self._headers())
         response.raise_for_status()
         data = response.json()
 
-        if (status := data.get("status")) and status == 401:
-            _LOGGER.warning("Token expired, re-authenticating")
-            self._token = None
-            self._ensure_authenticated()
-            session.headers["Authorization"] = f"Bearer {self._token}"
-            response = session.get(DEVICES_ENDPOINT)
-            response.raise_for_status()
-            data = response.json()
+        if data.get("code") != 200:
+            msg = data.get("message", str(data))
+            raise ValueError(f"Govee API error: {msg}")
 
-        # Filter for thermometer devices
-        devices = data.get("data", {}).get("devices", [])
-        thermometers = [d for d in devices if d.get("sku") == THERMOMETER_SKU]
+        devices = data.get("data", [])
 
-        _LOGGER.debug("Found %d thermometer devices", len(thermometers))
-        return thermometers
+        # Filter to devices that have sensor capabilities
+        sensor_devices = []
+        for device in devices:
+            caps = {c.get("instance") for c in device.get("capabilities", [])}
+            if caps & SENSOR_CAPABILITIES:
+                sensor_devices.append(device)
 
-    def extract_device_data(self, device: Dict) -> Dict:
-        """Extract temperature and other data from device."""
-        device_ext = device.get("deviceExt", {})
-        last_device_data_str = device_ext.get("lastDeviceData", "{}")
-        last_device_data = json.loads(last_device_data_str)
+        _LOGGER.debug("Found %d sensor devices", len(sensor_devices))
+        return sensor_devices
 
-        temp_raw = last_device_data.get("tem")
-        temperature = self.govee_temp_value(temp_raw) if temp_raw is not None else None
-
-        return {
-            "temperature": temperature,
-            "humidity": last_device_data.get("hum", 0) / 100.0
-            if last_device_data.get("hum")
-            else None,
-            "battery": json.loads(device_ext.get("deviceSettings", "{}")).get(
-                "battery"
-            ),
-            "online": last_device_data.get("online", False),
-            "last_update": last_device_data.get("lastTime"),
+    def get_device_state(self, sku: str, device_id: str) -> Dict[str, Any]:
+        """Get current state of a device."""
+        payload = {
+            "requestId": str(uuid.uuid4()),
+            "payload": {
+                "sku": sku,
+                "device": device_id,
+            },
         }
+
+        response = requests.post(
+            DEVICE_STATE_ENDPOINT, headers=self._headers(), json=payload
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        if data.get("code") != 200:
+            msg = data.get("message", str(data))
+            _LOGGER.warning("Failed to get state for %s: %s", device_id, msg)
+            return {}
+
+        return data.get("payload", {})
+
+    def extract_device_data(self, state_payload: Dict) -> Dict[str, Any]:
+        """Extract sensor data from device state capabilities."""
+        capabilities = state_payload.get("capabilities", [])
+
+        result: Dict[str, Any] = {
+            "temperature": None,
+            "humidity": None,
+            "battery": None,
+            "online": None,
+        }
+
+        for cap in capabilities:
+            instance = cap.get("instance")
+            state = cap.get("state", {})
+            value = state.get("value")
+
+            if instance == "sensorTemperature" and value is not None:
+                # API returns temperature in hundredths of a degree Celsius
+                result["temperature"] = round(value / 100.0, 1)
+            elif instance == "sensorHumidity" and value is not None:
+                # API returns humidity in hundredths of a percent
+                result["humidity"] = round(value / 100.0, 1)
+            elif instance == "battery" and value is not None:
+                result["battery"] = value
+            elif instance == "online" and value is not None:
+                result["online"] = value
+
+        return result
